@@ -21,16 +21,31 @@ import com.google.android.gms.wearable.WearableListenerService;
 
 import java.util.concurrent.TimeUnit;
 
-public class WeatherListenerService extends WearableListenerService implements
-        GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener{
+public class WeatherListenerService extends WearableListenerService {
 
     private static final String TAG = "WeatherListenerService";
+    private static final String START_ACTIVITY_PATH = "/start-activity";
+    private static final String DATA_ITEM_RECEIVED_PATH = "/data-item-received";
+
     GoogleApiClient mGoogleApiClient;
 
     @Override
     public void onDataChanged(DataEventBuffer dataEventBuffer) {
         LOGD(TAG, "onDataChanged: " + dataEventBuffer);
+
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addApi(Wearable.API)
+                .addConnectionCallbacks((GoogleApiClient.ConnectionCallbacks) this)
+                .addOnConnectionFailedListener((GoogleApiClient.OnConnectionFailedListener) this)
+                .build();
+
+        ConnectionResult connectionResult =
+                mGoogleApiClient.blockingConnect(30, TimeUnit.SECONDS);
+
+        if (!connectionResult.isSuccess()) {
+            Log.e(TAG, "Failed to connect to GoogleApiClient.");
+            return;
+        }
 
         for (DataEvent event: dataEventBuffer) {
             if (event.getType() == DataEvent.TYPE_CHANGED) {
@@ -44,37 +59,15 @@ public class WeatherListenerService extends WearableListenerService implements
 
             } else if (event.getType() == DataEvent.TYPE_DELETED) {
 
+                }
             }
-        }
 
+        }
     }
 
     public static void LOGD(final String tag, String message) {
         if (Log.isLoggable(tag, Log.DEBUG)) {
             Log.d(tag, message);
         }
-    }
-
-    @Override
-    public void onConnected(@Nullable Bundle bundle) {
-
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addApi(Wearable.API)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .build();
-
-        mGoogleApiClient.connect();
-
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-
-    }
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-
     }
 }
