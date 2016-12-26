@@ -388,12 +388,89 @@ public class MyWatchFace extends CanvasWatchFaceService {
             } else {
 
                 mViewWearLayout.measure(specW, specH);
-                mViewWearLayout.layout(0, 0, mViewWearLayout.getMeasuredWidth(),mViewWearLayout.getMeasuredHeight());
+                mViewWearLayout.layout(0, 0, mViewWearLayout.getMeasuredWidth(), mViewWearLayout.getMeasuredHeight());
                 mViewWearLayout.draw(canvas);
-               //canvas.drawBitmap(mBackgroundBitmap, 0, 0, mBackgroundPaint);
-
+                //canvas.drawBitmap(mBackgroundBitmap, 0, 0, mBackgroundPaint);
             }
 
+            /*
+             * Draw ticks. Usually you will want to bake this directly into the photo, but in
+             * cases where you want to allow users to select their own photos, this dynamically
+             * creates them on top of the photo.
+             */
+            float innerTickRadius = mCenterX - 10;
+            float outerTickRadius = mCenterX;
+            for (int tickIndex = 0; tickIndex < 12; tickIndex++) {
+                float tickRot = (float) (tickIndex * Math.PI * 2 / 12);
+                float innerX = (float) Math.sin(tickRot) * innerTickRadius;
+                float innerY = (float) -Math.cos(tickRot) * innerTickRadius;
+                float outerX = (float) Math.sin(tickRot) * outerTickRadius;
+                float outerY = (float) -Math.cos(tickRot) * outerTickRadius;
+                canvas.drawLine(mCenterX + innerX, mCenterY + innerY,
+                        mCenterX + outerX, mCenterY + outerY, mTickAndCirclePaint);
+            }
+
+            /*
+             * These calculations reflect the rotation in degrees per unit of time, e.g.,
+             * 360 / 60 = 6 and 360 / 12 = 30.
+             */
+            final float seconds =
+                    (mCalendar.get(Calendar.SECOND) + mCalendar.get(Calendar.MILLISECOND) / 1000f);
+            final float secondsRotation = seconds * 6f;
+
+            final float minutesRotation = mCalendar.get(Calendar.MINUTE) * 6f;
+
+            final float hourHandOffset = mCalendar.get(Calendar.MINUTE) / 2f;
+            final float hoursRotation = (mCalendar.get(Calendar.HOUR) * 30) + hourHandOffset;
+
+            /*
+             * Save the canvas state before we can begin to rotate it.
+             */
+            canvas.save();
+
+            canvas.rotate(hoursRotation, mCenterX, mCenterY);
+            canvas.drawLine(
+                    mCenterX,
+                    mCenterY - CENTER_GAP_AND_CIRCLE_RADIUS,
+                    mCenterX,
+                    mCenterY - sHourHandLength,
+                    mHourPaint);
+
+            canvas.rotate(minutesRotation - hoursRotation, mCenterX, mCenterY);
+            canvas.drawLine(
+                    mCenterX,
+                    mCenterY - CENTER_GAP_AND_CIRCLE_RADIUS,
+                    mCenterX,
+                    mCenterY - sMinuteHandLength,
+                    mMinutePaint);
+
+            /*
+             * Ensure the "seconds" hand is drawn only when we are in interactive mode.
+             * Otherwise, we only update the watch face once a minute.
+             */
+            if (!mAmbient) {
+                canvas.rotate(secondsRotation - minutesRotation, mCenterX, mCenterY);
+                canvas.drawLine(
+                        mCenterX,
+                        mCenterY - CENTER_GAP_AND_CIRCLE_RADIUS,
+                        mCenterX,
+                        mCenterY - mSecondHandLength,
+                        mSecondPaint);
+
+            }
+            canvas.drawCircle(
+                    mCenterX,
+                    mCenterY,
+                    CENTER_GAP_AND_CIRCLE_RADIUS,
+                    mTickAndCirclePaint);
+
+            /* Restore the canvas' original orientation. */
+            canvas.restore();
+
+            /* Draw rectangle behind peek card in ambient mode to improve readability. */
+            if (mAmbient) {
+                canvas.drawRect(mPeekCardBounds, mBackgroundPaint);
+            }
         }
 
         @Override
