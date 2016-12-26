@@ -1,6 +1,8 @@
 package com.example.android.wearsunshine.app;
 
 import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -30,6 +32,11 @@ public class WeatherListenerService extends WearableListenerService {
     GoogleApiClient mGoogleApiClient;
 
     @Override
+    public void onCreate() {
+        super.onCreate();
+    }
+
+    @Override
     public void onDataChanged(DataEventBuffer dataEventBuffer) {
         LOGD(TAG, "onDataChanged: " + dataEventBuffer);
 
@@ -55,9 +62,15 @@ public class WeatherListenerService extends WearableListenerService {
                 if (item.getUri().getPath().compareTo("/wear") == 0) {
                     DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
 //                    updateCount(dataMap.getInt(COUNT_KEY));
+                    String wearHigh = dataMap.getString("wearhightemp");
+                    String wearLow = dataMap.getString("wearlowtemp");
 
+                    Intent intent = new Intent("ACTION_WEATHER_UPDATE");
+                    intent.putExtra("wearhightemp",wearHigh);
+                    intent.putExtra("wearlowtemp",wearLow);
+                    sendBroadcast(intent);
 
-            } else if (event.getType() == DataEvent.TYPE_DELETED) {
+                } else if (event.getType() == DataEvent.TYPE_DELETED) {
 
                 }
             }

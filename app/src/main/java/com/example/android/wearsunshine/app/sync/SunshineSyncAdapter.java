@@ -462,9 +462,11 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements
             public void onResult(@NonNull DataApi.DataItemResult dataItemResult) {
                 if(dataItemResult.getStatus().isSuccess()){
                     //sucess in sending data
+                    Log.d(LOG_TAG, "sucess in sending data to wear");
                 }
                 else{
                     //fail to end data
+                    Log.d(LOG_TAG, "fail to end data to wear");
                 }
             }
         });
