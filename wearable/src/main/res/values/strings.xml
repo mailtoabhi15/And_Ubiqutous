@@ -2,4 +2,10 @@
     <string name="app_name">Wearable</string>
     <string name="message">Watch face tapped</string>
     <string name="my_analog_name">My Sunshine</string>
+    <string name="PREF_FILE_KEY">com.example.android.wearsunshine.app.PREF_FILE_KEY</string>
+    <string name="wearhightemp">wearhightemp</string>
+    <string name="wearlowtemp">wearlowtemp</string>
+    <string name="weatherId">weatherId</string>
+    <string name="defualt_temp">XX</string>
+
 </resources>

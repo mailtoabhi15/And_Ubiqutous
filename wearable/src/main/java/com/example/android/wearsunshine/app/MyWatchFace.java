@@ -21,6 +21,7 @@ import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -49,13 +50,18 @@ import android.view.Display;
 import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
 import android.view.View;
+import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.lang.ref.WeakReference;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
@@ -146,29 +152,45 @@ public class MyWatchFace extends CanvasWatchFaceService {
         private boolean mLowBitAmbient;
         private boolean mBurnInProtection;
 
+        private boolean mIsRound;
         private int specW, specH;
         private final Point displaySize = new Point();
         private View mViewWearLayout;
         private boolean mRegisteredWeatherReceiver =false;
         private String mWearHigh;
         private String mWearLow;
+        private int mWeatherId =0;
+        private String mDateString;
+        TextView mHighTextView;
+        TextView mLowTextView;
+        ImageView mWeatherIcon;
+        TextView mDateTextView;
 
         private BroadcastReceiver mWeatherDataReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 mWearHigh = intent.getStringExtra("wearhightemp");
                 mWearLow =intent.getStringExtra("wearlowtemp");
+                mWeatherId = intent.getIntExtra("weatherId",800);
 
-               TextView highTextView = (TextView) mViewWearLayout.findViewById(R.id.wear_high_textview);
-                highTextView.setText(mWearHigh);
-
-                TextView lowTextView = (TextView) mViewWearLayout.findViewById(R.id.wear_low_textview);
-                lowTextView.setText(mWearLow);
+                UpdateWeather();
 
                 invalidate();
 
             }
         };
+
+        private void UpdateWeather(){
+
+            mHighTextView.setText(mWearHigh);
+
+            mLowTextView.setText(mWearLow);
+
+            int iconResourceId = getIconResourceForWeatherCondition(mWeatherId);
+            mWeatherIcon.setImageResource(iconResourceId);
+
+            mDateTextView.setText(mDateString);
+        }
 
         @Override
         public void onCreate(SurfaceHolder holder) {
@@ -185,15 +207,18 @@ public class MyWatchFace extends CanvasWatchFaceService {
                     .build());
 
 
-            //Start-Code refrred from post: https://sterlingudell.wordpress.com/2015/05/10/layout-based-watch-faces-for-android-wear/
-            Display display = ((WindowManager) getSystemService(Context.WINDOW_SERVICE))
-                                 .getDefaultDisplay();
+            //Dixit:Start-Code for using layout for drawing content on watchface
+            // referred from post: https://sterlingudell.wordpress.com/2015/05/10/layout-based-watch-faces-for-android-wear/
+            Display display = ((WindowManager) getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
             display.getSize(displaySize);
 
-            specW = View.MeasureSpec.makeMeasureSpec(displaySize.x,
-                    View.MeasureSpec.EXACTLY);
-            specH = View.MeasureSpec.makeMeasureSpec(displaySize.y,
-                    View.MeasureSpec.EXACTLY);
+            specW = View.MeasureSpec.makeMeasureSpec(displaySize.x,View.MeasureSpec.EXACTLY);
+            specH = View.MeasureSpec.makeMeasureSpec(displaySize.y,View.MeasureSpec.EXACTLY);
+
+            mHighTextView = (TextView) mViewWearLayout.findViewById(R.id.wear_high_textview);
+            mLowTextView = (TextView) mViewWearLayout.findViewById(R.id.wear_low_textview);
+            mWeatherIcon = (ImageView) mViewWearLayout.findViewById(R.id.wear_img_forecast);
+            mDateTextView = (TextView) mViewWearLayout.findViewById(R.id.wear_date_textView);
             //End
 
             mBackgroundPaint = new Paint();
@@ -247,6 +272,17 @@ public class MyWatchFace extends CanvasWatchFaceService {
             });
 
             mCalendar = Calendar.getInstance();
+            Date date = mCalendar.getTime();
+            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("EEE MMM dd", Locale.getDefault());
+            mDateString = simpleDateFormat.format(date);
+
+            SharedPreferences sharedPref = getApplicationContext().getSharedPreferences(
+                                            getString(R.string.PREF_FILE_KEY),
+                                            Context.MODE_PRIVATE);
+
+            mWearHigh = sharedPref.getString(getString(R.string.wearhightemp),getString(R.string.defualt_temp));
+            mWearLow = sharedPref.getString(getString(R.string.wearlowtemp),getString(R.string.defualt_temp));
+            mWeatherId = sharedPref.getInt(getString(R.string.weatherId),800);
         }
 
         @Override
@@ -375,6 +411,14 @@ public class MyWatchFace extends CanvasWatchFaceService {
             invalidate();
         }
 
+        //Dixit:To detect whether the screen is square or round
+        @Override
+        public void onApplyWindowInsets(WindowInsets insets) {
+            super.onApplyWindowInsets(insets);
+            mIsRound = insets.isRound();
+
+        }
+
         @Override
         public void onDraw(Canvas canvas, Rect bounds) {
             long now = System.currentTimeMillis();
@@ -481,6 +525,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
                 registerReceiver();
                 /* Update time zone in case it changed while we weren't visible. */
                 mCalendar.setTimeZone(TimeZone.getDefault());
+                UpdateWeather();
                 invalidate();
             } else {
                 unregisterReceiver();
@@ -497,43 +542,34 @@ public class MyWatchFace extends CanvasWatchFaceService {
         }
 
         private void registerReceiver() {
-            if (mRegisteredTimeZoneReceiver) {
-                return;
-            }
-            else{
-            mRegisteredTimeZoneReceiver = true;
-            IntentFilter filter = new IntentFilter(Intent.ACTION_TIMEZONE_CHANGED);
-            MyWatchFace.this.registerReceiver(mTimeZoneReceiver, filter);
+            if (!mRegisteredTimeZoneReceiver)
+            {
+                mRegisteredTimeZoneReceiver = true;
+                IntentFilter filter = new IntentFilter(Intent.ACTION_TIMEZONE_CHANGED);
+                MyWatchFace.this.registerReceiver(mTimeZoneReceiver, filter);
             }
 
-            if (mRegisteredWeatherReceiver) {
-                return;
-            }
-            else{
+            if (!mRegisteredWeatherReceiver)
+            {
                 mRegisteredWeatherReceiver = true;
                 IntentFilter filter = new IntentFilter("ACTION_WEATHER_UPDATE");
                 MyWatchFace.this.registerReceiver(mWeatherDataReceiver, filter);
             }
-
-
+            return;
         }
 
         private void unregisterReceiver() {
-            if (!mRegisteredTimeZoneReceiver) {
-                return;
-            }
-            else {
+            if (mRegisteredTimeZoneReceiver) {
+
                 mRegisteredTimeZoneReceiver = false;
                 MyWatchFace.this.unregisterReceiver(mTimeZoneReceiver);
             }
-            if (!mRegisteredWeatherReceiver) {
-                return;
-            }
-            else {
+            if (mRegisteredWeatherReceiver){
+
                 mRegisteredWeatherReceiver = false;
                 MyWatchFace.this.unregisterReceiver(mWeatherDataReceiver);
             }
-
+            return;
         }
 
         /**
@@ -565,6 +601,42 @@ public class MyWatchFace extends CanvasWatchFaceService {
                         - (timeMs % INTERACTIVE_UPDATE_RATE_MS);
                 mUpdateTimeHandler.sendEmptyMessageDelayed(MSG_UPDATE_TIME, delayMs);
             }
+        }
+
+
+        /**
+         * Helper method to provide the icon resource id according to the weather condition id returned
+         * by the OpenWeatherMap call.
+         * @param weatherId from OpenWeatherMap API response
+         * @return resource id for the corresponding icon. -1 if no relation is found.
+         */
+        private int getIconResourceForWeatherCondition(int weatherId) {
+            // Based on weather code data found at:
+            // http://bugs.openweathermap.org/projects/api/wiki/Weather_Condition_Codes
+            if (weatherId >= 200 && weatherId <= 232) {
+                return R.drawable.ic_storm;
+            } else if (weatherId >= 300 && weatherId <= 321) {
+                return R.drawable.ic_light_rain;
+            } else if (weatherId >= 500 && weatherId <= 504) {
+                return R.drawable.ic_rain;
+            } else if (weatherId == 511) {
+                return R.drawable.ic_snow;
+            } else if (weatherId >= 520 && weatherId <= 531) {
+                return R.drawable.ic_rain;
+            } else if (weatherId >= 600 && weatherId <= 622) {
+                return R.drawable.ic_snow;
+            } else if (weatherId >= 701 && weatherId <= 761) {
+                return R.drawable.ic_fog;
+            } else if (weatherId == 761 || weatherId == 781) {
+                return R.drawable.ic_storm;
+            } else if (weatherId == 800) {
+                return R.drawable.ic_clear;
+            } else if (weatherId == 801) {
+                return R.drawable.ic_light_clouds;
+            } else if (weatherId >= 802 && weatherId <= 804) {
+                return R.drawable.ic_cloudy;
+            }
+            return -1;
         }
 
     }

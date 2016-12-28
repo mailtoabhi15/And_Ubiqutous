@@ -93,8 +93,13 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements
     private static final int INDEX_MIN_TEMP = 2;
     private static final int INDEX_SHORT_DESC = 3;
 
+    private GoogleApiClient mGoogleApiClient;
+    private boolean mConnectedGoogleApiClient = false;
+
     @Override
     public void onConnected(@Nullable Bundle bundle) {
+
+        mConnectedGoogleApiClient = true;
 
     }
 
@@ -105,6 +110,7 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements
 
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+        mConnectedGoogleApiClient = false;
 
     }
 
@@ -163,6 +169,14 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements
             final String UNITS_PARAM = "units";
             final String DAYS_PARAM = "cnt";
             final String APPID_PARAM = "APPID";
+
+            //Dixit:adding google Api connect request , so as ot send update to wear
+            mGoogleApiClient = new GoogleApiClient.Builder(getContext())
+                    .addConnectionCallbacks(this)
+                    .addOnConnectionFailedListener(this)
+                    .addApi(Wearable.API)
+                    .build();
+            mGoogleApiClient.connect();
 
             Uri.Builder uriBuilder = Uri.parse(FORECAST_BASE_URL).buildUpon();
 
@@ -286,6 +300,7 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements
         final String OWM_MESSAGE_CODE = "cod";
 
         try {
+
             JSONObject forecastJson = new JSONObject(forecastJsonStr);
             Context context = getContext();
 
@@ -407,7 +422,7 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements
                 updateWidgets();
                 updateMuzei();
                 notifyWeather();
-                updateWear(high,low);
+                updateWear();
             }
             Log.d(LOG_TAG, "Sync Complete. " + cVVector.size() + " Inserted");
             setLocationStatus(getContext(), LOCATION_STATUS_OK);
@@ -419,57 +434,47 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements
         }
     }
 
-    private void updateWear(double high, double low) {
+    private void updateWear() {
 
-        GoogleApiClient mGoogleApiClient = new GoogleApiClient.Builder(getContext())
-                .addConnectionCallbacks(new GoogleApiClient.ConnectionCallbacks() {
+        String location = Utility.getPreferredLocation(getContext());
+        Uri weatherUri = WeatherContract.WeatherEntry.buildWeatherLocationWithDate(location, System.currentTimeMillis());
+        Cursor cursor = getContext().getContentResolver().query(weatherUri, NOTIFY_WEATHER_PROJECTION, null, null, null);
+
+        if (cursor != null && cursor.moveToFirst()) {
+            int weatherId = cursor.getInt(INDEX_WEATHER_ID);
+            double high = cursor.getDouble(INDEX_MAX_TEMP);
+            double low = cursor.getDouble(INDEX_MIN_TEMP);
+
+            String wearHigh = Utility.formatTemperature(getContext(), high);
+            String wearLow = Utility.formatTemperature(getContext(), low);
+
+            PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/wear");
+
+            putDataMapReq.getDataMap().putString("wearhightemp", wearHigh);
+            putDataMapReq.getDataMap().putString("wearlowtemp", wearLow);
+            putDataMapReq.getDataMap().putInt("weatherId",weatherId);
+
+            PutDataRequest putDataReq = putDataMapReq.asPutDataRequest().setUrgent();
+
+            if (mConnectedGoogleApiClient == true) {
+                PendingResult<DataApi.DataItemResult> pendingResult = Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq);
+
+                pendingResult.setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
                     @Override
-                    public void onConnected(Bundle connectionHint) {
-                        Log.d(TAG, "onConnected: " + connectionHint);
-                        // Now you can use the Data Layer API
+                    public void onResult(@NonNull DataApi.DataItemResult dataItemResult) {
+                        if (dataItemResult.getStatus().isSuccess()) {
+                            //sucess in sending data
+                            Log.d(LOG_TAG, "sucess in sending data to wear");
+                        } else {
+                            //fail to end data
+                            Log.d(LOG_TAG, "fail to end data to wear");
+                            mConnectedGoogleApiClient = false;
+                        }
                     }
-                    @Override
-                    public void onConnectionSuspended(int cause) {
-                        Log.d(TAG, "onConnectionSuspended: " + cause);
-                    }
-                })
-                .addOnConnectionFailedListener(new GoogleApiClient.OnConnectionFailedListener() {
-                    @Override
-                    public void onConnectionFailed(ConnectionResult result) {
-                        Log.d(TAG, "onConnectionFailed: " + result);
-                    }
-                })
-                // Request access only to the Wearable API
-                .addApi(Wearable.API)
-                .build();
-        mGoogleApiClient.connect();
-
-
-        String wearHigh = Utility.formatTemperature(getContext(), high);
-        String wearLow = Utility.formatTemperature(getContext(), low);
-
-        PutDataMapRequest putDataMapReq = PutDataMapRequest.create("/wear");
-
-        putDataMapReq.getDataMap().putString("wearhightemp", wearHigh);
-        putDataMapReq.getDataMap().putString("wearlowtemp", wearLow);
-
-        PutDataRequest putDataReq = putDataMapReq.asPutDataRequest().setUrgent();
-
-        PendingResult<DataApi.DataItemResult> pendingResult =
-                Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq);
-        pendingResult.setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
-            @Override
-            public void onResult(@NonNull DataApi.DataItemResult dataItemResult) {
-                if(dataItemResult.getStatus().isSuccess()){
-                    //sucess in sending data
-                    Log.d(LOG_TAG, "sucess in sending data to wear");
-                }
-                else{
-                    //fail to end data
-                    Log.d(LOG_TAG, "fail to end data to wear");
-                }
+                });
             }
-        });
+            cursor.close();
+        }
 
     }
 

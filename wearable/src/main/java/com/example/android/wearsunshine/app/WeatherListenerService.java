@@ -4,6 +4,7 @@ import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.annotation.NonNull;
@@ -26,10 +27,6 @@ import java.util.concurrent.TimeUnit;
 public class WeatherListenerService extends WearableListenerService {
 
     private static final String TAG = "WeatherListenerService";
-    private static final String START_ACTIVITY_PATH = "/start-activity";
-    private static final String DATA_ITEM_RECEIVED_PATH = "/data-item-received";
-
-    GoogleApiClient mGoogleApiClient;
 
     @Override
     public void onCreate() {
@@ -40,19 +37,6 @@ public class WeatherListenerService extends WearableListenerService {
     public void onDataChanged(DataEventBuffer dataEventBuffer) {
         LOGD(TAG, "onDataChanged: " + dataEventBuffer);
 
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addApi(Wearable.API)
-                .addConnectionCallbacks((GoogleApiClient.ConnectionCallbacks) this)
-                .addOnConnectionFailedListener((GoogleApiClient.OnConnectionFailedListener) this)
-                .build();
-
-        ConnectionResult connectionResult =
-                mGoogleApiClient.blockingConnect(30, TimeUnit.SECONDS);
-
-        if (!connectionResult.isSuccess()) {
-            Log.e(TAG, "Failed to connect to GoogleApiClient.");
-            return;
-        }
 
         for (DataEvent event: dataEventBuffer) {
             if (event.getType() == DataEvent.TYPE_CHANGED) {
@@ -64,10 +48,23 @@ public class WeatherListenerService extends WearableListenerService {
 //                    updateCount(dataMap.getInt(COUNT_KEY));
                     String wearHigh = dataMap.getString("wearhightemp");
                     String wearLow = dataMap.getString("wearlowtemp");
+                    int weatherId = dataMap.getInt("weatherId");
+
+                    //Dixit:Saving last received data data locally
+                    SharedPreferences sharedPref = getApplicationContext().getSharedPreferences(
+                            getString(R.string.PREF_FILE_KEY),
+                            WearableListenerService.MODE_PRIVATE);
+
+                    SharedPreferences.Editor editor = sharedPref.edit();
+                    editor.putString(getString(R.string.wearhightemp),wearHigh);
+                    editor.putString(getString(R.string.wearhightemp),wearLow);
+                    editor.putInt(getString(R.string.wearhightemp),weatherId);
+                    editor.apply();
 
                     Intent intent = new Intent("ACTION_WEATHER_UPDATE");
                     intent.putExtra("wearhightemp",wearHigh);
                     intent.putExtra("wearlowtemp",wearLow);
+                    intent.putExtra("weatherId",weatherId);
                     sendBroadcast(intent);
 
                 } else if (event.getType() == DataEvent.TYPE_DELETED) {
