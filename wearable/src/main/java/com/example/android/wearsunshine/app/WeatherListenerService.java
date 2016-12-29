@@ -57,8 +57,8 @@ public class WeatherListenerService extends WearableListenerService {
 
                     SharedPreferences.Editor editor = sharedPref.edit();
                     editor.putString(getString(R.string.wearhightemp),wearHigh);
-                    editor.putString(getString(R.string.wearhightemp),wearLow);
-                    editor.putInt(getString(R.string.wearhightemp),weatherId);
+                    editor.putString(getString(R.string.wearlowtemp),wearLow);
+                    editor.putInt(getString(R.string.weatherId),weatherId);
                     editor.apply();
 
                     Intent intent = new Intent("ACTION_WEATHER_UPDATE");
