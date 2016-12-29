@@ -47,6 +47,7 @@ import android.support.wearable.watchface.WatchFaceStyle;
 import android.text.format.DateUtils;
 import android.util.Log;
 import android.view.Display;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
 import android.view.View;
@@ -67,6 +68,7 @@ import java.util.concurrent.TimeUnit;
 
 import static android.content.ContentValues.TAG;
 import static android.content.Context.POWER_SERVICE;
+import static android.support.wearable.watchface.WatchFaceStyle.PROTECT_HOTWORD_INDICATOR;
 
 /**
  * Analog watch face with a ticking second hand. In ambient mode, the second hand isn't
@@ -203,6 +205,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
                     .setCardPeekMode(WatchFaceStyle.PEEK_MODE_SHORT)
                     .setBackgroundVisibility(WatchFaceStyle.BACKGROUND_VISIBILITY_INTERRUPTIVE)
                     .setShowSystemUiTime(false)
+                    .setHotwordIndicatorGravity(Gravity.CENTER_VERTICAL)
+                    .setViewProtectionMode(PROTECT_HOTWORD_INDICATOR)
                     .setAcceptsTapEvents(true)
                     .build());
 
